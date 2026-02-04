@@ -11,7 +11,6 @@ RUN apk update && \
         curl && \
     rm -rf /var/cache/apk/*
 
-
 RUN addgroup -S gamegroup && \
     adduser -S gameuser -G gamegroup
 
@@ -22,16 +21,11 @@ RUN npm install --production && \
     npm cache clean --force
 
 COPY src/ ./src/
-COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh && \
-    chown -R gameuser:gamegroup /app
+RUN chown -R gameuser:gamegroup /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV MAX_PLAYERS=100
-ENV TICK_RATE=50
-ENV SERVER_NAME=DockerCloud-GameServer
 
 USER gameuser
 
@@ -40,4 +34,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["node", "src/server.js"]

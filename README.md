@@ -3,9 +3,9 @@
 ## 📋 Description
 
 Ce projet met en place une architecture cloud personnalisée basée sur Docker, comprenant :
-- **Frontend** : Serveur web Nginx servant une application HTML/JS
-- **Backend** : API REST Python/Flask
-- **Game Server** : Serveur de jeu Node.js avec WebSocket
+- **Frontend** : Serveur web Nginx servant une page HTML statique
+- **Backend** : API REST Node.js minimaliste
+- **Game Server** : Serveur de jeu Node.js
 - **Portainer** : Interface de gestion Docker (image officielle)
 - **Atlas** : Visualisation réseau et containers en temps réel (image officielle)
 
@@ -15,11 +15,11 @@ Ce projet met en place une architecture cloud personnalisée basée sur Docker, 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Docker Network (cloud-network)                    │
 │                                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                   │
-│  │   Frontend   │    │   Backend    │    │  Game Server │                   │
-│  │   (Nginx)    │───▶│   (Flask)    │    │   (Node.js)  │                  │
-│  │   :8080      │    │   :5000      │    │   :3000      │                   │
-│  └──────────────┘    └──────────────┘    └──────────────┘                   │
+│  ┌──────────────┐     ┌──────────────┐    ┌──────────────┐                  │
+│  │   Frontend   │     │   Backend    │    │  Game Server │                  │
+│  │   (Nginx)    │───▶│   (Node.js)  │    │   (Node.js)  │                  │
+│  │   :8080      │     │   :5000      │    │   :3000      │                  │
+│  └──────────────┘     └──────────────┘    └──────────────┘                  │
 │         │                   │                   │                           │
 │         └───────────────────┴───────────────────┘                           │
 │                             │                                               │
@@ -43,21 +43,18 @@ projet-final/
 ├── frontend/
 │   ├── Dockerfile
 │   ├── nginx.conf
-│   ├── entrypoint.sh
 │   └── src/
 │       └── index.html
 ├── backend/
 │   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── entrypoint.sh
-│   └── src/
-│       └── app.py
-├── gameserver/
-│   ├── Dockerfile
 │   ├── package.json
-│   ├── entrypoint.sh
 │   └── src/
 │       └── server.js
+└── gameserver/
+    ├── Dockerfile
+    ├── package.json
+    └── src/
+        └── server.js
 ```
 
 ---
@@ -67,10 +64,9 @@ projet-final/
 ### Dépendances installées
 | Dépendance | Raison |
 |------------|--------|
-| `alpine:3.19` | Image de base légère (~5MB) |
+| `alpine:3.20` | Image de base légère (~5MB) |
 | `nginx` | Serveur web haute performance |
 | `curl` | Pour les health checks |
-| `gettext` | Pour envsubst (substitution variables) |
 
 ### Ports exposés
 | Port | Usage |
@@ -82,58 +78,50 @@ projet-final/
 - Configuration des permissions pour l'utilisateur `nginx`
 - Copie de la configuration Nginx personnalisée
 
-### Arguments au run
-| Variable | Description | Défaut |
-|----------|-------------|--------|
-| `NGINX_WORKER_PROCESSES` | Nombre de workers Nginx | `auto` |
-| `NGINX_WORKER_CONNECTIONS` | Connexions par worker | `1024` |
-| `BACKEND_HOST` | Hostname du backend | `backend` |
-| `BACKEND_PORT` | Port du backend | `5000` |
-
-### Entrypoint
-Le script `entrypoint.sh` :
-1. Remplace les variables d'environnement dans la config Nginx via `envsubst`
-2. Vérifie la configuration Nginx avec `nginx -t`
-3. Lance Nginx en mode foreground (`daemon off`) pour capturer les signaux
+### CMD
+```dockerfile
+CMD ["nginx", "-g", "daemon off;"]
+```
+Nginx s'exécute en mode foreground (PID 1) pour :
+- Recevoir directement les signaux SIGTERM
+- Permettre un arrêt gracieux des connexions
 
 ---
 
-## 🔧 Image Backend (Flask/Python)
+## 🔧 Image Backend (Node.js)
 
 ### Dépendances installées
 | Dépendance | Raison |
 |------------|--------|
-| `alpine:3.19` | Image de base légère |
-| `python3` | Runtime Python |
-| `py3-pip` | Gestionnaire de paquets Python |
-| `flask` | Framework web minimaliste |
-| `gunicorn` | Serveur WSGI production-ready |
+| `alpine:3.20` | Image de base légère |
+| `nodejs` | Runtime JavaScript |
+| `npm` | Gestionnaire de paquets |
 | `curl` | Pour les health checks |
 
 ### Ports exposés
 | Port | Usage |
 |------|-------|
-| 5000 | API REST Flask |
+| 5000 | API REST HTTP |
 
 ### Manipulations OS
 - Création d'un utilisateur non-root `appuser:appgroup`
-- Installation des dépendances Python via pip avec `--break-system-packages`
+- Installation des dépendances npm en mode production
 - Configuration du répertoire de travail `/app`
 
 ### Arguments au run
 | Variable | Description | Défaut |
 |----------|-------------|--------|
-| `FLASK_ENV` | Environnement (development/production) | `production` |
-| `GUNICORN_WORKERS` | Nombre de workers Gunicorn | `2` |
-| `GUNICORN_THREADS` | Threads par worker | `4` |
-| `GUNICORN_BIND` | Adresse d'écoute | `0.0.0.0:5000` |
-| `LOG_LEVEL` | Niveau de log | `info` |
+| `NODE_ENV` | Environnement Node | `production` |
+| `PORT` | Port d'écoute | `5000` |
 
-### Entrypoint
-Le script `entrypoint.sh` :
-1. Affiche la configuration au démarrage
-2. Lance Gunicorn avec `exec` pour recevoir les signaux SIGTERM directement
-3. Configure `--graceful-timeout 30` pour un arrêt propre
+### CMD
+```dockerfile
+CMD ["node", "src/server.js"]
+```
+Node.js s'exécute directement (PID 1) pour :
+- Recevoir les signaux SIGTERM/SIGINT
+- Afficher `[Backend] UP` au démarrage
+- Afficher `[Backend] DOWN` à l'arrêt
 
 ---
 
@@ -142,16 +130,15 @@ Le script `entrypoint.sh` :
 ### Dépendances installées
 | Dépendance | Raison |
 |------------|--------|
-| `alpine:3.19` | Image de base légère |
+| `alpine:3.20` | Image de base légère |
 | `nodejs` | Runtime JavaScript |
-| `npm` | Gestionnaire de paquets Node |
-| `ws` | Bibliothèque WebSocket |
+| `npm` | Gestionnaire de paquets |
 | `curl` | Pour les health checks |
 
 ### Ports exposés
 | Port | Usage |
 |------|-------|
-| 3000 | WebSocket + HTTP - Serveur de jeu |
+| 3000 | HTTP - Serveur de jeu |
 
 ### Manipulations OS
 - Création d'un utilisateur non-root `gameuser:gamegroup`
@@ -163,15 +150,15 @@ Le script `entrypoint.sh` :
 |----------|-------------|--------|
 | `NODE_ENV` | Environnement Node | `production` |
 | `PORT` | Port d'écoute | `3000` |
-| `MAX_PLAYERS` | Nombre max de joueurs | `100` |
-| `TICK_RATE` | Taux de rafraîchissement (ms) | `50` |
-| `SERVER_NAME` | Nom du serveur | `DockerCloud-GameServer` |
 
-### Entrypoint
-Le script `entrypoint.sh` :
-1. Affiche la configuration
-2. Lance Node.js avec `exec` pour la gestion des signaux
-3. Le serveur gère lui-même la fermeture gracieuse des WebSockets
+### CMD
+```dockerfile
+CMD ["node", "src/server.js"]
+```
+Node.js s'exécute directement (PID 1) pour :
+- Recevoir les signaux SIGTERM/SIGINT
+- Afficher `[GameServer] UP` au démarrage
+- Afficher `[GameServer] DOWN` à l'arrêt
 
 ---
 
@@ -183,17 +170,17 @@ Le script `entrypoint.sh` :
 |-----------|-----------|--------------|-------------------|---------------|
 | frontend | 0.5 | 128MB | 64MB | Fichiers statiques uniquement |
 | backend | 1.0 | 256MB | 128MB | API REST avec traitement modéré |
-| gameserver | 1.5 | 512MB | 256MB | Temps réel, multiples WebSockets |
-| portainer | 0.5 | 128MB | 64MB | Interface légère |
-| Atlas | 0.5 | 256MB | 128MB | Collecte de métriques |
+| gameserver | 1.5 | 512MB | 256MB | Serveur de jeu, potentiellement plus gourmand |
+| portainer | 0.5 | 256MB | 128MB | Interface de gestion |
+| atlas | 0.5 | 256MB | 128MB | Collecte de métriques |
 
 ### Gestion des SIGTERM
 
 Chaque container gère proprement les signaux d'arrêt :
 - `stop_grace_period: 30s` pour les services principaux
 - `stop_grace_period: 10s` pour les outils de monitoring
-- Les entrypoints utilisent `exec` pour recevoir les signaux directement
-- Fermeture gracieuse des connexions (WebSocket, HTTP)
+- Les processus Node.js/Nginx sont en PID 1 (pas de script entrypoint)
+- Logs `UP` au démarrage, `DOWN` à l'arrêt
 
 ### Dépendances et ordre de démarrage
 
@@ -222,16 +209,10 @@ depends_on:
 
 ## 🚀 Utilisation
 
-### Build des images
+### Build et lancement
 
 ```bash
-docker compose build
-```
-
-### Lancement
-
-```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 ### Vérification des services
@@ -241,7 +222,7 @@ docker compose ps
 docker compose logs -f
 ```
 
-### Arrêt
+### Test de l'arrêt gracieux
 
 ```bash
 docker compose down
@@ -251,9 +232,9 @@ docker compose down
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Frontend | http://localhost:8080 | Interface web principale |
+| Frontend | http://localhost:8080 | Interface web |
 | Backend API | http://localhost:5000 | API REST |
-| Game Server | ws://localhost:3000 | WebSocket |
+| Game Server | http://localhost:3000 | Serveur de jeu |
 | Portainer | http://localhost:9000 | Gestion Docker |
 | Atlas | http://localhost:4040 | Visualisation réseau |
 
@@ -273,22 +254,12 @@ docker compose down
  ┌──────────┐            ┌──────────┐            ┌──────────┐
  │ :8080    │            │ :5000    │            │ :3000    │
  │ Frontend │            │ Backend  │            │ Game     │
- │ (HTTP)   │            │ (HTTP)   │            │ (WS)     │
+ │ (HTTP)   │            │ (HTTP)   │            │ Server   │
  └────┬─────┘            └──────────┘            └──────────┘
       │                        ▲
       │   /api/*               │
       └────────────────────────┘
                (proxy)
-
-        ┌───────────────────────────────────────────────┐
-        │              Outils de Monitoring              │
-        │                                               │
-        │  ┌──────────┐                 ┌──────────┐   │
-        │  │ :9000    │                 │ :4040    │   │
-        │  │Portainer │◄───────────────►│  Scope   │   │
-        │  │(Gestion) │  docker.sock    │ (Réseau) │   │
-        │  └──────────┘                 └──────────┘   │
-        └───────────────────────────────────────────────┘
 ```
 
 ---
@@ -296,9 +267,7 @@ docker compose down
 ## 🔒 Sécurité
 
 - ✅ Tous les containers applicatifs tournent avec des utilisateurs non-root
-- ✅ Aucune image provenant directement de Docker Hub sans personnalisation
+- ✅ Aucune image utilisée directement sans personnalisation
 - ✅ Limitation des ressources pour éviter les attaques DoS
 - ✅ Health checks pour détecter les anomalies
-- ✅ Volumes Docker socket en lecture seule pour Portainer/Atlas
-- ⚠️ Scope nécessite le mode privilégié (à désactiver en production sensible)
-
+- ✅ Volumes Docker socket en lecture seule pour Portainer

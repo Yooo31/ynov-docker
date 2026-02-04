@@ -1,7 +1,7 @@
 {
-  "name": "docker-cloud-gameserver",
+  "name": "docker-cloud-backend",
   "version": "1.0.0",
-  "description": "Game Server for Docker Cloud project",
+  "description": "Backend API for Docker Cloud project",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js"

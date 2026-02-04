@@ -5,11 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: cloud-backend
     environment:
-      - FLASK_ENV=production
-      - GUNICORN_WORKERS=2
-      - GUNICORN_THREADS=4
-      - GUNICORN_BIND=0.0.0.0:5000
-      - LOG_LEVEL=info
+      - NODE_ENV=production
+      - PORT=5000
     ports:
       - "5000:5000"
     networks:
@@ -38,11 +35,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      - NGINX_WORKER_PROCESSES=auto
-      - NGINX_WORKER_CONNECTIONS=1024
-      - BACKEND_HOST=backend
-      - BACKEND_PORT=5000
     ports:
       - "8080:80"
     networks:
@@ -71,9 +63,6 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MAX_PLAYERS=100
-      - TICK_RATE=50
-      - SERVER_NAME=DockerCloud-GameServer
     ports:
       - "3000:3000"
     networks:
@@ -127,9 +116,6 @@ services:
     environment:
       - ATLAS_UI_PORT=4040
       - ATLAS_API_PORT=4041
-      - DOCKERSCAN_INTERVAL=60
-      - FASTSCAN_INTERVAL=300
-      - DEEPSCAN_INTERVAL=600
     deploy:
       resources:
         limits:
