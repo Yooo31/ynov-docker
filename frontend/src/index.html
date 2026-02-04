@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Cloud - Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            padding: 40px 0;
+        }
+        h1 {
+            font-size: 3rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 1.2rem;
+        }
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        .service-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 217, 255, 0.2);
+        }
+        .service-card h2 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .service-card p {
+            color: #aaa;
+            line-height: 1.6;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+        .status.online {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+        .status.offline {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+        }
+        .status.checking {
+            background: rgba(255, 200, 0, 0.2);
+            color: #ffc800;
+        }
+        #backend-response, #game-status {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding: 20px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐳 Docker Cloud</h1>
+            <p class="subtitle">Architecture Cloud Personnalisée</p>
+        </header>
+
+        <div class="services">
+            <!-- Frontend Card -->
+            <div class="service-card">
+                <h2>🖥️ Frontend</h2>
+                <p>Serveur web Nginx servant cette interface utilisateur. 
+                   Configuration personnalisée avec proxy vers le backend.</p>
+                <span class="status online">● En ligne</span>
+            </div>
+
+            <!-- Backend Card -->
+            <div class="service-card">
+                <h2>⚙️ Backend API</h2>
+                <p>API REST Flask/Python avec Gunicorn. 
+                   Gère la logique métier et les données.</p>
+                <span id="backend-status" class="status checking">● Vérification...</span>
+                <div id="backend-response"></div>
+            </div>
+
+            <!-- Game Server Card -->
+            <div class="service-card">
+                <h2>🎮 Game Server</h2>
+                <p>Serveur de jeu Node.js avec WebSocket. 
+                   Gère les connexions temps réel des joueurs.</p>
+                <span id="game-status-badge" class="status checking">● Vérification...</span>
+                <div id="game-status"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Projet Docker Cloud - Cours Docker 2025-2026</p>
+        </footer>
+    </div>
+
+    <script>
+        // Vérification du backend
+        async function checkBackend() {
+            const statusEl = document.getElementById('backend-status');
+            const responseEl = document.getElementById('backend-response');
+            
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                statusEl.className = 'status online';
+                statusEl.textContent = '● En ligne';
+                responseEl.innerHTML = `<strong>Réponse:</strong> ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                statusEl.className = 'status offline';
+                statusEl.textContent = '● Hors ligne';
+                responseEl.innerHTML = `<strong>Erreur:</strong> ${error.message}`;
+            }
+        }
+
+        // Vérification du Game Server via WebSocket
+        function checkGameServer() {
+            const statusEl = document.getElementById('game-status-badge');
+            const infoEl = document.getElementById('game-status');
+            
+            try {
+                const ws = new WebSocket('ws://localhost:3000');
+                
+                ws.onopen = () => {
+                    statusEl.className = 'status online';
+                    statusEl.textContent = '● En ligne';
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    infoEl.innerHTML = `<strong>Serveur:</strong> ${JSON.stringify(data, null, 2)}`;
+                    ws.close();
+                };
+                
+                ws.onerror = () => {
+                    statusEl.className = 'status offline';
+                    statusEl.textContent = '● Hors ligne';
+                    infoEl.innerHTML = '<strong>Erreur:</strong> Connexion WebSocket échouée';
+                };
+            } catch (error) {
+                statusEl.className = 'status offline';
+                statusEl.textContent = '● Hors ligne';
+                infoEl.innerHTML = `<strong>Erreur:</strong> ${error.message}`;
+            }
+        }
+
+        // Lancer les vérifications au chargement
+        document.addEventListener('DOMContentLoaded', () => {
+            checkBackend();
+            checkGameServer();
+            
+            // Rafraîchir toutes les 30 secondes
+            setInterval(checkBackend, 30000);
+            setInterval(checkGameServer, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloud-backend
+    environment:
+      - FLASK_ENV=production
+      - GUNICORN_WORKERS=2
+      - GUNICORN_THREADS=4
+      - GUNICORN_BIND=0.0.0.0:5000
+      - LOG_LEVEL=info
+    ports:
+      - "5000:5000"
+    networks:
+      - cloud-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          memory: 128M
+    stop_grace_period: 30s
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cloud-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - NGINX_WORKER_PROCESSES=auto
+      - NGINX_WORKER_CONNECTIONS=1024
+      - BACKEND_HOST=backend
+      - BACKEND_PORT=5000
+    ports:
+      - "8080:80"
+    networks:
+      - cloud-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          memory: 64M
+    stop_grace_period: 30s
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  gameserver:
+    build:
+      context: ./gameserver
+      dockerfile: Dockerfile
+    container_name: cloud-gameserver
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MAX_PLAYERS=100
+      - TICK_RATE=50
+      - SERVER_NAME=DockerCloud-GameServer
+    ports:
+      - "3000:3000"
+    networks:
+      - cloud-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 512M
+        reservations:
+          memory: 256M
+    stop_grace_period: 30s
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: cloud-portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    networks:
+      - cloud-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 128M
+    stop_grace_period: 10s
+    restart: unless-stopped
+
+  atlas:
+    image: keinstien/atlas:latest
+    container_name: cloud-atlas
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - ATLAS_UI_PORT=4040
+      - ATLAS_API_PORT=4041
+      - DOCKERSCAN_INTERVAL=60
+      - FASTSCAN_INTERVAL=300
+      - DEEPSCAN_INTERVAL=600
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 128M
+    stop_grace_period: 10s
+    restart: unless-stopped
+
+volumes:
+  portainer_data:
+    driver: local
+
+networks:
+  cloud-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

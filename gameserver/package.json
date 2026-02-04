@@ -1,0 +1,18 @@
+{
+  "name": "docker-cloud-gameserver",
+  "version": "1.0.0",
+  "description": "Game Server with WebSocket for Docker Cloud project",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "author": "Docker Cloud Project",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
